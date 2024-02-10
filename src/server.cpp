@@ -1,39 +1,99 @@
-#include <stdbool.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
+//
+// Created by rudi on 2/5/24.
+//
 
-#include <errno.h>
+#include <cassert>
+#include <cerrno>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+
 #include <netinet/in.h>
 #include <unistd.h>
 
+const size_t k_max_msg = 4096;
 
-static void message(const char *message)
-{
+static void message(const char *message) {
     fprintf(stderr, "%s\n", message);
 }
 
-
-static void die(const char *message)
-{
+static void die(const char *message) {
     int err = errno;
     fprintf(stderr, "[%d] %s\n", err, message);
     abort();
 }
 
-static void do_something(int conn_fd) {
-    char read_buffer[64] = {};
-    ssize_t n = read(conn_fd, read_buffer, sizeof(read_buffer) - 1);
-    if (n < 0) {
-        message("read() error");
-        return;
-    }
-    printf("client says: %s\n", read_buffer);
+static int32_t read_full(int fd, char *buffer, size_t n) {
+    while (n > 0) {
+        ssize_t rv = read(fd, buffer, n);
+        if (rv <= 0) {
+            return -1;
+        }
 
-    char write_buffer[] = "world";
-    write(conn_fd, write_buffer, strlen(write_buffer));
+        assert((ssize_t) rv <= n);
+        n -= (ssize_t) rv;
+        buffer += rv;
+    }
+
+    return 0;
 }
 
+static int32_t write_all(int fd, char *buffer, size_t n) {
+    while (n > 0) {
+        ssize_t rv = write(fd, buffer, n);
+        if (rv <= 0) {
+            return -1;
+        }
+
+        assert((ssize_t) rv <= n);
+        n -= (ssize_t) rv;
+        buffer += rv;
+    }
+
+    return 0;
+}
+
+static int32_t one_request(int conn_fd) {
+    // 4 bytes header
+    char read_buffer[4 + k_max_msg + 1];
+    errno = 0;
+    int32_t err = read_full(conn_fd, read_buffer, 4);
+    if (err) {
+        if (errno == 0) {
+            message("EOF");
+        } else {
+            message("read() error");
+        }
+
+        return err;
+    }
+
+    uint32_t len = 0;
+    memcpy(&len, read_buffer, 4);
+    if (len > k_max_msg) {
+        message("too long");
+        return -1;
+    }
+
+    // request body
+    err = read_full(conn_fd, &read_buffer[4], len);
+    if (err) {
+        message("read() error");
+        return err;
+    }
+
+    read_buffer[4+len] = '\0';
+    printf("client says: %s\n", &read_buffer[4]);
+
+    // reply using the same protocol
+    const char reply[] = "world";
+    char write_buffer[4 + sizeof(reply)];
+    len = (uint32_t) strlen(reply);
+    memcpy(write_buffer, &len, 4);
+    memcpy(&write_buffer[4], reply, len);
+
+    return write_all(conn_fd, write_buffer, 4+len);
+}
 
 int main()
 {
@@ -63,7 +123,7 @@ int main()
     }
 
     while (true) {
-        struct sockaddr_in client_addr;
+        struct sockaddr_in client_addr = {};
         bzero(&client_addr, sizeof(client_addr));
         socklen_t socklen = sizeof(client_addr);
 
@@ -72,8 +132,14 @@ int main()
             continue;
         }
 
-        do_something(conn_fd);
-        close(conn_fd);
+        while (true) {
+            int32_t err = one_request(conn_fd);
+            if (err) {
+                break;
+            }
+        }
+
+        close(fd);
     }
 
     return 0;
