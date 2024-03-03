@@ -8,8 +8,7 @@
 #include <message_protocol.h>
 #include <util.h>
 
-int main()
-{
+int main() {
     int fd = socket(AF_INET, SOCK_STREAM, 0);
     if (fd < 0) {
         util::die("socket()");
@@ -25,19 +24,19 @@ int main()
     }
 
     // multiple requests
-    int32_t err = jedis::query(fd, "hello1");
-    if (err) {
-        goto L_DONE;
+    const char *query_list[3] = {"hello1", "hello2", "hello3"};
+    for (auto &i : query_list) {
+        int32_t err = jedis::send_req(fd, i);
+        if (err) {
+            goto L_DONE;
+        }
     }
 
-    err = jedis::query(fd, "hello2");
-    if (err) {
-        goto L_DONE;
-    }
-
-    err = jedis::query(fd, "hello3");
-    if (err) {
-        goto L_DONE;
+    for (auto _ : query_list) {
+        int32_t err = jedis::read_res(fd);
+        if (err) {
+            goto L_DONE;
+        }
     }
 
 L_DONE:

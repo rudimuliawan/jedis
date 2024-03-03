@@ -2,57 +2,15 @@
 // Created by rudi on 2/5/24.
 //
 
-#include <cerrno>
-#include <cstdio>
 #include <cstring>
+#include <vector>
 
+#include <poll.h>
 #include <netinet/in.h>
 #include <unistd.h>
 
 #include <message_protocol.h>
 #include <util.h>
-
-static int32_t one_request(int conn_fd) {
-    // 4 bytes inc
-    char read_buffer[4 + jedis::k_max_msg + 1];
-    errno = 0;
-    int32_t err = jedis::read_full(conn_fd, read_buffer, 4);
-    if (err) {
-        if (errno == 0) {
-            util::message("EOF");
-        } else {
-            util::message("read() error");
-        }
-
-        return err;
-    }
-
-    uint32_t len = 0;
-    memcpy(&len, read_buffer, 4);
-    if (len > jedis::k_max_msg) {
-        util::message("too long");
-        return -1;
-    }
-
-    // request body
-    err = jedis::read_full(conn_fd, &read_buffer[4], len);
-    if (err) {
-        util::message("read() error");
-        return err;
-    }
-
-    read_buffer[4+len] = '\0';
-    printf("client says: %s\n", &read_buffer[4]);
-
-    // reply using the same protocol
-    const char reply[] = "world";
-    char write_buffer[4 + sizeof(reply)];
-    len = (uint32_t) strlen(reply);
-    memcpy(write_buffer, &len, 4);
-    memcpy(&write_buffer[4], reply, len);
-
-    return jedis::write_all(conn_fd, write_buffer, 4 + len);
-}
 
 int main()
 {
@@ -81,25 +39,73 @@ int main()
         util::die("listen()");
     }
 
-    while (true) {
-        struct sockaddr_in client_addr = {};
-        bzero(&client_addr, sizeof(client_addr));
-        socklen_t socklen = sizeof(client_addr);
+    // a map of all client connections
+    std::vector<jedis::Conn *> fd2conn;
 
-        int conn_fd = accept(fd, (struct sockaddr *) &client_addr, &socklen);
-        if (conn_fd < 0) {
-            continue;
+    // set the listen fd to nonblocking mode
+    util::set_fd_to_non_blocking(fd);
+
+    // the event loop
+    std::vector<struct pollfd> poll_args;
+    while (true) {
+        poll_args.clear();
+
+        struct pollfd pfd = {fd, POLLIN, 0};
+        poll_args.push_back(pfd);
+
+        for (jedis::Conn *conn: fd2conn) {
+            if (!conn) {
+                continue;
+            }
+
+            struct pollfd pfd = {};
+            pfd.fd = conn->fd;
+            pfd.events = (conn->state == jedis::STATE_REQ) ? POLLIN : POLLOUT;
+            pfd.events = pfd.events | POLLERR;
+            poll_args.push_back(pfd);
         }
 
-        while (true) {
-            int32_t err = one_request(conn_fd);
-            if (err) {
-                break;
+        int rv = poll(poll_args.data(), (nfds_t) poll_args.size(), 1000);
+        if (rv < 0) {
+            util::die("poll()");
+        }
+
+        for (size_t i = 1; i < poll_args.size(); ++i) {
+            if (poll_args[i].revents) {
+                jedis::Conn *conn = fd2conn[poll_args[i].fd];
+                jedis::connection_io(conn);
+
+                if (conn->state == jedis::STATE_END) {
+                    fd2conn[conn->fd] = nullptr;
+                    close(conn->fd);
+                    free(conn);
+                }
             }
         }
 
-        close(fd);
+        if (poll_args[0].revents) {
+            (void) jedis::accept_new_conn(fd2conn, fd);
+        }
     }
 
     return 0;
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

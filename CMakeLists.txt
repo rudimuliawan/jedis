@@ -10,6 +10,7 @@ set(LIB_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/message_protocol.cpp"
         src/util.cpp
         inc/util.h
+        inc/jedis/connection.h
 )
 add_library(jedis STATIC ${LIB_SOURCES})
 target_compile_features(jedis
