@@ -1,142 +1,140 @@
-#include <netinet/in.h>
-#include <sys/socket.h>
-#include <unistd.h>
-
+//
+// Created by rudi on 11/11/24.
+//
 #include <cassert>
 #include <cerrno>
+#include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
 
+#include <unistd.h>
+#include <arpa/inet.h>
+#include <sys/socket.h>
+#include <netinet/ip.h>
+
+static void msg(const char *msg) {
+    fprintf(stderr, "%s\n", msg);
+}
+
+static void die(const char *msg) {
+    int err = errno;
+    fprintf(stderr, "[%d] %s\n", err, msg);
+    abort();
+}
+
 const size_t k_max_msg = 4096;
 
-void die(const char *message)
-{
-    printf("%s\n", message);
-    exit(1);
-}
-
-void message(const char *message)
-{
-    printf("%s\n", message);
-}
-
-static int32_t read_full(int fd, char *buffer, size_t n)
-{
+static int32_t read_full(int fd, char *buf, size_t n) {
     while (n > 0) {
-        ssize_t read_n = read(fd, buffer, n);
-        if (read_n <= 0) {
-            return -1;
+        ssize_t rv = read(fd, buf, n);
+        if (rv <= 0) {
+            return -1;  // error, or unexpected EOF
         }
-
-        assert((size_t) read_n <= n);
-        n -= (size_t) read_n;
-        buffer += read_n;
+        assert((size_t)rv <= n);
+        n -= (size_t)rv;
+        buf += rv;
     }
-
     return 0;
 }
 
-static int32_t write_all(int fd, char *buffer, size_t n)
-{
+static int32_t write_all(int fd, const char *buf, size_t n) {
     while (n > 0) {
-        ssize_t write_n = write(fd, buffer, n);
-        if (write_n <= 0) {
-            return -1;
+        ssize_t rv = write(fd, buf, n);
+        if (rv <= 0) {
+            return -1;  // error
         }
-
-        assert((size_t) write_n <= n);
-        n -= (size_t) write_n;
-        buffer += write_n;
+        assert((size_t)rv <= n);
+        n -= (size_t)rv;
+        buf += rv;
     }
-
     return 0;
 }
 
-int32_t one_request(int conn_fd)
-{
-    // 4 bytes length
-    char read_buffer[4 + k_max_msg + 1];
+static int32_t one_request(int connfd) {
+    // 4 bytes header
+    char rbuf[4 + k_max_msg + 1];
     errno = 0;
-
-    int32_t err = read_full(conn_fd, read_buffer, 4);
+    int32_t err = read_full(connfd, rbuf, 4);
     if (err) {
         if (errno == 0) {
-            message("error : EOF");
+            msg("EOF");
+        } else {
+            msg("read() error");
         }
-        else {
-            message("error : read()");
-        }
-
         return err;
     }
 
     uint32_t len = 0;
-    memcpy(&len, read_buffer, 4);
+    memcpy(&len, rbuf, 4);  // assume little endian
     if (len > k_max_msg) {
-        message("error : too long");
+        msg("too long");
         return -1;
     }
 
     // request body
-    err = read_full(conn_fd, &read_buffer[4], len);
+    err = read_full(connfd, &rbuf[4], len);
     if (err) {
-        message("error : read()");
+        msg("read() error");
         return err;
     }
 
-    // print message
-    read_buffer[4 + len] = '\0';
-    printf("client says: %s\n", &read_buffer[4]);
+    // do something
+    rbuf[4 + len] = '\0';
+    printf("client says: %s\n", &rbuf[4]);
 
     // reply using the same protocol
     const char reply[] = "world";
-    char write_buffer[4 + sizeof(reply)];
-    len = (uint32_t) strlen(reply);
-    memcpy(write_buffer, &len, 4);
-    memcpy(&write_buffer[4], reply, len);
-    return write_all(conn_fd, write_buffer, 4+len);
+    char wbuf[4 + sizeof(reply)];
+    len = (uint32_t)strlen(reply);
+    memcpy(wbuf, &len, 4);
+    memcpy(&wbuf[4], reply, len);
+    return write_all(connfd, wbuf, 4 + len);
 }
 
-int main()
-{
-    int sock_fd = socket(AF_INET, SOCK_STREAM, 0);
-    if (sock_fd < 0) {
-        die("error: socket()");
+int main() {
+    int fd = socket(AF_INET, SOCK_STREAM, 0);
+    if (fd < 0) {
+        die("socket()");
     }
 
+    // this is needed for most server applications
     int val = 1;
-    setsockopt(sock_fd, SOL_SOCKET, SO_REUSEADDR, &val, sizeof(val));
+    setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &val, sizeof(val));
 
-    struct sockaddr_in address = {};
-    address.sin_family = AF_INET;
-    address.sin_port = ntohs(1234);
-    address.sin_addr.s_addr = ntohl(0);
-
-    if (bind(sock_fd, (const sockaddr *) &address, sizeof(address)) < 0) {
-        die("error: bind()");
+    // bind
+    struct sockaddr_in addr = {};
+    addr.sin_family = AF_INET;
+    addr.sin_port = ntohs(8000);
+    addr.sin_addr.s_addr = ntohl(0);    // wildcard address 0.0.0.0
+    int rv = bind(fd, (const sockaddr *)&addr, sizeof(addr));
+    if (rv) {
+        die("bind()");
     }
 
-    if (listen(sock_fd, SOMAXCONN) < 0) {
-        die("error: listen()");
+    // listen
+    rv = listen(fd, SOMAXCONN);
+    if (rv) {
+        die("listen()");
     }
 
     while (true) {
-        struct sockaddr_in client_address = {};
-        socklen_t socklen = sizeof(client_address);
-        int conn_fd = accept(sock_fd, (struct sockaddr *) &client_address, &socklen);
-        if (conn_fd < 0) {
-            continue;
+        // accept
+        struct sockaddr_in client_addr = {};
+        socklen_t socklen = sizeof(client_addr);
+        int connfd = accept(fd, (struct sockaddr *)&client_addr, &socklen);
+        if (connfd < 0) {
+            continue;   // error
         }
 
         while (true) {
-            int32_t err = one_request(conn_fd);
+            // here the server only serves one client connection at once
+            int32_t err = one_request(connfd);
             if (err) {
                 break;
             }
         }
-
-        close(conn_fd);
+        close(connfd);
     }
 
     return 0;
