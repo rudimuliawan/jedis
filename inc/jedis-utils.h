@@ -5,6 +5,6 @@
 #ifndef JEDIS_UTILS_H
 #define JEDIS_UTILS_H
 
-void panic(const char *message);
+void die(const char *message);
 
 #endif //JEDIS_UTILS_H

@@ -12,7 +12,7 @@ target_include_directories(jedis-utils
         inc
 )
 
-# Bin
+# Jedis Server
 set(JEDIS_SERVER_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/jedis-server.c"
 )
@@ -22,6 +22,20 @@ target_include_directories(jedis-server
         inc
 )
 target_link_libraries(jedis-server
-    PRIVATE
+    PUBLIC
+        jedis-utils
+)
+
+# Jedis Client
+set(JEDIS_CLIENT_SOURCES
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/jedis-client.c"
+)
+add_executable(jedis-client ${JEDIS_CLIENT_SOURCES})
+target_include_directories(jedis-client
+    PUBLIC
+        inc
+)
+target_link_libraries(jedis-client
+    PUBLIC
         jedis-utils
 )
