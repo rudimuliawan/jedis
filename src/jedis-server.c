@@ -20,7 +20,7 @@ int main() {
     }
 
     // Allow socket to reuse a same address (port) after program restarts
-    int val = 1;
+    const int val = 1;
     setsockopt(sock_fd, SOL_SOCKET, SO_REUSEADDR, &val, sizeof(val));
 
     struct sockaddr_in address;

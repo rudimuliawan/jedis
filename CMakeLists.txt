@@ -2,6 +2,9 @@ cmake_minimum_required(VERSION 3.17 FATAL_ERROR)
 
 project(jedis)
 
+# External Library
+find_package(glib REQUIRED)
+
 # Static Library
 set(LIB_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/jedis-utils.c"
@@ -25,6 +28,7 @@ target_include_directories(jedis-server
 target_link_libraries(jedis-server
     PUBLIC
         jedis-utils
+        glib::glib
 )
 
 # Jedis Client
