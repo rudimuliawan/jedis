@@ -5,6 +5,7 @@ project(jedis)
 # Static Library
 set(LIB_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/jedis-utils.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/jedis-message.c"
 )
 add_library(jedis-utils STATIC ${LIB_SOURCES})
 target_include_directories(jedis-utils

@@ -1,31 +1,16 @@
 //
 // Created by rudi on 3/20/25.
 //
+#include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
-#include <stdbool.h>
 
 #include <netinet/in.h>
 #include <sys/socket.h>
 #include <unistd.h>
 
+#include <jedis-message.h>
 #include <jedis-utils.h>
-
-void do_something(int conn_fd) {
-    char r_buff[64];
-    bzero(&r_buff, sizeof(r_buff));
-
-    const ssize_t n = read(conn_fd, r_buff, sizeof(r_buff)-1);
-    if (n < 0) {
-        printf("read() error");
-        return;
-    }
-
-    printf("client says: %s\n", r_buff);
-
-    char w_buff[] = "Worlds";
-    write(conn_fd, w_buff, strlen(w_buff));
-}
 
 int main() {
     // Create a TCP socket
@@ -65,9 +50,13 @@ int main() {
             continue;
         }
 
-        do_something(conn_fd);
+        while (true) {
+            const int32_t err = one_request(conn_fd);
+            if (err) {
+                break;
+            }
+        }
 
-        // do something
         close(conn_fd);
     }
 }

@@ -7,8 +7,8 @@
 #include <netinet/in.h>
 #include <sys/socket.h>
 
+#include <jedis-message.h>
 #include <jedis-utils.h>
-#include <stdio.h>
 
 int main() {
     int sock_fd = socket(AF_INET, SOCK_STREAM, 0);
@@ -27,17 +27,17 @@ int main() {
         die("connect()");
     }
 
-    char message[] = "hello";
-    write(sock_fd, &message, strlen(message));
-
-    char read_buffer[64];
-    bzero(&read_buffer, sizeof(read_buffer) - 1);
-
-    ssize_t n = read(sock_fd, &read_buffer, sizeof(read_buffer)-1);
-    if (n < 0) {
-        die("read()");
+    uint32_t err = query(sock_fd, "Hello1");
+    if (err) {
+        goto L_DONE;;
     }
 
-    printf("server says: %s\n", read_buffer);
+    err = query(sock_fd, "Hello2");
+    if (err) {
+        goto L_DONE;;
+    }
+
+L_DONE:
     close(sock_fd);
+    return 0;
 }

@@ -11,3 +11,7 @@ void die(const char *message) {
     printf("error : %s\n", message);
     exit(1);
 }
+
+void msg(const char *message) {
+    printf("%s\n", message);
+}

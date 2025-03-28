@@ -6,5 +6,6 @@
 #define JEDIS_UTILS_H
 
 void die(const char *message);
+void msg(const char *message);
 
 #endif //JEDIS_UTILS_H
