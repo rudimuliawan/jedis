@@ -1,9 +1,0 @@
-[requires]
-glib/2.81.0
-
-[generators]
-CMakeDeps
-CMakeToolchain
-
-[layout]
-cmake_layout

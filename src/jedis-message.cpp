@@ -1,16 +1,16 @@
 //
 // Created by Rudi Muliawan on 22/03/25.
 //
+#include <cerrno>
+#include <cassert>
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
 
-#include <strings.h>
-#include <assert.h>
-#include <errno.h>
 #include <unistd.h>
 
-#include <jedis-message.h>
-#include <jedis-utils.h>
-#include <stdio.h>
-#include <string.h>
+#include <jedis-message.hpp>
+#include <jedis-utils.hpp>
 
 #define K_MAX_MSG 4096
 
@@ -50,20 +50,20 @@ int32_t one_request(const int conn_fd) {
 
     int32_t err = read_full(conn_fd, r_buff, 4);
     if (err) {
-        msg(errno == 0 ? "EOF" : "read(): error");
+        Utils::msg(errno == 0 ? "EOF" : "read(): error");
         return err;
     }
 
     uint32_t len = 0;
     memcpy(&len, r_buff, 4);
     if (len > K_MAX_MSG) {
-        msg("message too long!");
+        Utils::msg("message too long!");
         return -1;
     }
 
     err = read_full(conn_fd, &r_buff[4], len);
     if (err) {
-        msg(errno == 0 ? "EOF" : "read(): error");
+        Utils::msg(errno == 0 ? "EOF" : "read(): error");
         return err;
     }
 
@@ -95,19 +95,19 @@ int32_t query(const int conn_fd, const char *text) {
     errno = 0;
     err = read_full(conn_fd, r_buffer, 4);
     if (err) {
-        msg(errno == 0 ? "EOF" : "read() error");
+        Utils::msg(errno == 0 ? "EOF" : "read() error");
         return -1;
     }
 
     memcpy(&len, r_buffer, 4);
     if (len > K_MAX_MSG) {
-        msg("Too Long");
+        Utils::msg("Too Long");
         return -1;
     }
 
     err = read_full(conn_fd, &r_buffer[4], len);
     if (err) {
-        msg("read error");
+        Utils::msg("read error");
         return err;
     }
 
