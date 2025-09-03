@@ -2,6 +2,7 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
+#include <cstring>
 #include <cstdlib>
 #include <iostream>
 #include <utils.h>
@@ -14,7 +15,7 @@ int main() {
 
     struct sockaddr_in addr = {};
     addr.sin_family = AF_INET;
-    addr.sin_port = ntohs(1234);
+    addr.sin_port = ntohs(8123);
     addr.sin_addr.s_addr = ntohl(INADDR_LOOPBACK);
 
     if (auto rv = connect(fd, (const struct sockaddr*)&addr, sizeof(addr))) {

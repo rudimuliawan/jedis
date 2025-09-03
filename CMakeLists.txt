@@ -4,6 +4,20 @@ project(jedis)
 
 set(CMAKE_CXX_STANDARD 17)
 
+# static library
+set(LIB_SOURCES
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/tcp/tcp.cpp")
+add_library(jedis-lib ${LIB_SOURCES})
+target_compile_features(jedis-lib
+    PUBLIC
+        cxx_std_17
+)
+target_include_directories(jedis-lib
+    PUBLIC
+        inc
+)
+
+# binary application
 add_executable(client src/client.cpp)
 add_executable(server src/server.cpp)
 
@@ -15,4 +29,8 @@ target_include_directories(client
 target_include_directories(server
     PUBLIC
         inc
+)
+target_link_libraries(server
+    PUBLIC
+        jedis-lib
 )

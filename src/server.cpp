@@ -1,9 +1,10 @@
 #include <netinet/in.h>
-#include <sys/socket.h>
 #include <unistd.h>
 
+#include <cstring>
 #include <iostream>
-#include <utils.h>
+
+#include <jedis/tcp.h>
 
 void do_something(int conn_fd) {
     char r_buffer[64] = {};
@@ -18,39 +19,10 @@ void do_something(int conn_fd) {
     write(conn_fd, w_buff, strlen(w_buff));
 }
 
-[[noreturn]] int main() {
-    auto fd = socket(AF_INET, SOCK_STREAM, 0);
-    if (fd < 0) {
-        DIE("socket()");
-    }
+int main() {
+    Jedis::TcpSocket tcp {};
 
-    constexpr int val = 1;
-    setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &val, sizeof(val));
-
-    struct sockaddr_in addr = {};
-    addr.sin_family = AF_INET;
-    addr.sin_port = ntohs(1234);
-    addr.sin_addr.s_addr = htonl(0);
-
-    int rv = bind(fd, (const struct sockaddr*) &addr, sizeof(addr));
-    if (rv) {
-        DIE("bind()");
-    }
-
-    rv = listen(fd, SOMAXCONN);
-    if (rv) {
-        DIE("listen()");
-    }
-
-    while (true) {
-        struct sockaddr_in client_addr = {};
-        socklen_t addrlen = sizeof(client_addr);
-        int conn_fd = accept(fd, (struct sockaddr *) &client_addr, &addrlen);
-        if (conn_fd < 0) {
-            continue;
-        }
-
-        do_something(conn_fd);
-        close(conn_fd);
-    }
+    tcp.SetupPort(8123);
+    tcp.SetupAddress("0.0.0.0");
+    tcp.Accept(&do_something);
 }
