@@ -6,6 +6,45 @@
 #include <cstdlib>
 #include <iostream>
 #include <utils.h>
+#include <jedis/message.h>
+
+using Jedis::K_MAX_MSG;
+
+static int32_t query(int fd, const char *text) {
+    uint32_t len = (uint32_t)strlen(text);
+    if (len > K_MAX_MSG) {
+        return -1;
+    }
+    // send request
+    char wbuf[4 + K_MAX_MSG];
+    memcpy(wbuf, &len, 4); // assume little endian
+    memcpy(&wbuf[4], text, len);
+    if (int32_t err = Jedis::write_all(fd, wbuf, 4 + len)) {
+        return err;
+    }
+    // 4 bytes header
+    char rbuf[4 + K_MAX_MSG + 1];
+    errno = 0;
+    int32_t err = Jedis::read_full(fd, rbuf, 4);
+    if (err) {
+        std::cout << (errno == 0 ? "EOF" : "read() error") << std::endl;
+        return err;
+    }
+    memcpy(&len, rbuf, 4); // assume little endian
+    if (len > K_MAX_MSG) {
+        std::cout << "too long" << std::endl;
+        return -1;
+    }
+    // reply body
+    err = Jedis::read_full(fd, &rbuf[4], len);
+    if (err) {
+        std::cout << "read() error" << std::endl;
+        return err;
+    }
+    // do something
+    printf("server says: %.*s\n", len, &rbuf[4]);
+    return 0;
+}
 
 int main() {
     const auto fd = socket(AF_INET, SOCK_STREAM, 0);
@@ -22,15 +61,17 @@ int main() {
         DIE("connect()");
     }
 
-    constexpr char msg[] = "hello";
-    write(fd, msg, strlen(msg));
-
-    char r_buff[64] = {};
-    if (const ssize_t n = read(fd, r_buff, sizeof(r_buff)-1); n < 0) {
-        DIE("read");
+    int32_t err = query(fd, "hello1");
+    if (err) {
+        goto L_DONE;
+    }
+    err = query(fd, "hello2");
+    if (err) {
+        goto L_DONE;
     }
 
-    std::cout << r_buff << std::endl;
+L_DONE:
+    close(fd);
 
-    return EXIT_SUCCESS;
+    return 0;
 }
