@@ -1,13 +1,14 @@
 //
 // Created by Rudi Muliawan on 27/08/25.
 //
-
 #pragma once
 
-#include <iostream>
+#include <cstdlib>
 #include <string>
 
-inline void DIE(const std::string &message) {
-    std::cout << "DIE : " << message << std::endl;
-    exit(-1);
-}
+constexpr size_t K_MAX_MSG = 4096;
+
+void die(const std::string &message);
+int32_t read_full(int fd, char *buffer, size_t n);
+int32_t write_all(int fd, char *buffer, std::size_t n);
+int32_t one_request(int conn_fd);

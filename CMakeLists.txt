@@ -6,8 +6,7 @@ set(CMAKE_CXX_STANDARD 17)
 
 # static library
 set(LIB_SOURCES
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/jedis/tcp.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/jedis/message.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/utils.cpp"
 )
 add_library(jedis-lib STATIC ${LIB_SOURCES})
 target_compile_features(jedis-lib
